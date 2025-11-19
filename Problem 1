@@ -1,0 +1,240 @@
+
+## Packages
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(tidytext)
+library(maps)
+library(shiny)
+library(plotly)
+library(countrycode)
+library(gridExtra)
+library(patchwork)
+```
+
+
+########## Problem 1 ########### 
+
+Milk Production
+```{r }
+milk_prod <- read.csv("https://raw.githubusercontent.com/mahsaashouri/STA309-Dataset/refs/heads/main/Milk-Production-Consumption/milk-production-tonnes.csv")
+
+milk_prod_data <- milk_prod %>%
+  rename(Country = Entity,
+         Year = Year, 
+         Production = "Milk.Production..tonnes.") 
+
+# Remove ambiguous/irrelevant countries
+milk_prod_countries <- milk_prod_data %>%
+  filter(!Country %in% c(
+    "Africa","Africa (FAO)","Americas (FAO)","Asia","Asia (FAO)",
+    "Belgium-Luxembourg (FAO)","Caribbean (FAO)","Central America (FAO)",
+    "Central Asia (FAO)","Eastern Africa (FAO)","Eastern Asia (FAO)",
+    "Eastern Europe (FAO)","Europe","Europe (FAO)",
+    "European Union (27)","European Union (27) (FAO)",
+    "High-income countries","Land Locked Developing Countries (FAO)",
+    "Least Developed Countries (FAO)","Low-income countries",
+    "Low Income Food Deficit Countries (FAO)","Lower-middle-income countries",
+    "Melanesia","Middle Africa (FAO)",
+    "Net Food Importing Developing Countries (FAO)",
+    "North America","Northern Africa (FAO)","Northern America (FAO)",
+    "Northern Europe (FAO)","Oceania","Oceania (FAO)","Polynesia",
+    "Small Island Developing States (FAO)","South-eastern Asia (FAO)",
+    "South America","South America (FAO)","Southern Africa (FAO)",
+    "Southern Asia (FAO)","Southern Europe (FAO)",
+    "Upper-middle-income countries","Western Africa (FAO)",
+    "Western Asia (FAO)","Western Europe (FAO)",
+    "World"))
+
+# Normalize Country Names
+milk_prod_clean <- milk_prod_countries %>%
+  mutate(Country_clean = countrycode(Country, "country.name", "country.name"))
+
+
+# Draw in population data to normalize Production Values
+population <- read.csv("https://raw.githubusercontent.com/owid/owid-datasets/master/datasets/Population%20(OWID%20based)/Population%20(OWID%20based).csv")
+
+population_clean <- population %>%
+  rename(Country = country,
+         Year = year,
+         Population = population) %>%
+  mutate(Country_clean = countrycode(Country, "country.name", "country.name"))
+
+milk_prod_clean <- milk_prod_clean %>%
+  inner_join(population_clean %>% select(Year, Country_clean, Population),
+             by = c("Year", "Country_clean"))
+
+milk_prod_clean <- milk_prod_clean %>%
+  mutate(Production_normalized =
+           (Production * 1000) / Population)
+
+
+```
+
+
+Milk Consumption
+```{r }
+milk_cons <- read.csv("https://raw.githubusercontent.com/mahsaashouri/STA309-Dataset/refs/heads/main/Milk-Production-Consumption/per-capita-milk-consumption.csv")
+
+milk_cons_data <- milk_cons %>%
+  rename(Country = Entity, 
+         Year = Year, 
+         Consumption = "Milk.consumption..kilograms.per.year.per.capita.")
+
+# Remove ambiguous/irrelevant countries
+milk_cons_clean <- milk_cons_data %>%
+  filter(!Country %in% c(
+    "Africa","Africa (FAO)","Americas (FAO)","Asia","Asia (FAO)",
+    "Belgium-Luxembourg (FAO)","Caribbean (FAO)","Central America (FAO)",
+    "Central Asia (FAO)","Eastern Africa (FAO)","Eastern Asia (FAO)",
+    "Eastern Europe (FAO)","Europe","Europe (FAO)",
+    "European Union (27)","European Union (27) (FAO)",
+    "High-income countries","Land Locked Developing Countries (FAO)",
+    "Least Developed Countries (FAO)","Low-income countries",
+    "Low Income Food Deficit Countries (FAO)","Lower-middle-income countries",
+    "Melanesia","Middle Africa (FAO)",
+    "Net Food Importing Developing Countries (FAO)",
+    "North America","Northern Africa (FAO)","Northern America (FAO)",
+    "Northern Europe (FAO)","Oceania","Oceania (FAO)","Polynesia",
+    "Small Island Developing States (FAO)","South-eastern Asia (FAO)",
+    "South America","South America (FAO)","Southern Africa (FAO)",
+    "Southern Asia (FAO)","Southern Europe (FAO)",
+    "Upper-middle-income countries","Western Africa (FAO)",
+    "Western Asia (FAO)","Western Europe (FAO)",
+    "World"))
+
+# Match consumption years to production years
+prod_years <- unique(milk_prod_clean$Year)
+
+# Normalize Country Names & Match years
+milk_cons_clean <- milk_cons_clean  %>%
+  mutate(Country_clean = countrycode(Country, "country.name", "country.name")) %>%
+  filter(Year %in% prod_years)
+
+```
+
+
+# Maps
+```{r }
+world_map <- map_data("world") 
+
+world_map <- world_map %>%
+  mutate(region_clean = countrycode(region, "country.name", "country.name"))
+
+year_selected <- 2000
+```
+
+Milk Production Map
+```{r }
+prod_year <- milk_prod_clean %>%
+  filter(Year == year_selected) 
+
+map_prod <- world_map %>%
+  inner_join(prod_year, by = c("region_clean" = "Country_clean"))
+
+production_map <- ggplot(map_prod, aes(x = long, y = lat, group = group, fill = Production)) +
+  geom_polygon(color = "gray50", size = 0.1) +
+  scale_fill_viridis_c(option = "viridis", na.value = "gray90") +
+  labs(title = paste("Milk Production in", year_selected),
+       subtitle = "Kilograms per person",
+       fill = "") +
+  theme_void(base_size = 11) +
+  theme(plot.subtitle = element_text(size = 10))
+production_map
+
+```
+
+Milk Consumption Map
+```{r }
+cons_year <- milk_cons_clean %>%
+  filter(Year == year_selected)
+
+map_cons <- world_map %>%
+  inner_join(cons_year, by = c("region_clean" = "Country_clean"))
+
+consumption_map <- ggplot(map_cons, aes(x = long, y = lat, group = group, fill = Consumption)) +
+  geom_polygon(color = "gray50", size = 0.1) +
+  scale_fill_viridis_c(option = "viridis", na.value = "gray90") +
+  labs(title = paste("Milk Consumption in", year_selected),
+       subtitle = "Kilograms per person",
+       fill = "") +
+  theme_void(base_size = 11) +
+  theme(plot.subtitle = element_text(size = 10))
+consumption_map
+
+```
+* The year 2000 was chosen due to its "turn of the century" mentality.
+
+Time Trend Map
+```{r }
+country_selected <- "United States"
+
+prod_country <- milk_prod_clean %>%
+  filter(Country_clean == country_selected)
+
+cons_country <- milk_cons_clean %>%
+  filter(Country_clean == country_selected)
+
+merged_time <- full_join(
+  prod_country %>% select (Year, Country_clean, Production_normalized),
+  cons_country %>% select (Year, Country_clean, Consumption),
+  by = c("Country_clean", "Year"))
+glimpse(merged_time)
+
+time_series_plot <- ggplot(merged_time, aes(x = Year)) +
+  geom_line(aes(y = Production_normalized, color = "Production"), size = 1) +
+  geom_line(aes(y = Consumption, color = "Consumption"), size = 1) +
+  scale_color_manual(values = c("Production" = "steelblue",
+                                "Consumption" = "firebrick")) +
+  labs(title = paste("Consumption vs Production -", country_selected),
+       subtitle = "Comparison of US milk production & consumption values from 1995-2013",
+       y = "kg/person", color = "") +
+  annotate("text", x = 2010, y = 250, label = "Notable decrease\n likely due to 2009\n recession",
+           color = "black", size = 3, hjust = 0) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", plot.subtitle = element_text(size = 10))
+time_series_plot
+
+```
+
+
+Comparison Map
+```{r }
+merged_scatter <- full_join(
+  milk_prod_clean %>% select(Country_clean, Year, Production_normalized),
+  milk_cons_clean %>% select(Country_clean, Year, Consumption),
+  by = c("Country_clean", "Year"))
+
+merged_scatter <- merged_scatter %>%
+  mutate(Continent = countrycode(Country_clean, "country.name", "continent"))
+
+scatter_map <- ggplot(merged_scatter, aes(x = Production_normalized, y = Consumption, color = Continent)) +
+  geom_point(alpha = 0.7, size = 2) +
+  geom_smooth(method = "lm", color = "black", se = FALSE) +
+  labs(title = "Global Comparison Between Production and Consumption",
+       subtitle = "Each point represents a country/year observation",
+       x = "Production",
+       y = "Consumption",
+       color = "Continent") +
+  annotate("text", x = 1500, y = 600, label = "Relatively balanced global\nconsumption to production ratio",
+           color = "black", size = 3, hjust = 0) +
+  annotate("text", x = 250, y = 700, label = "Asia is the\nlargest global\nconsumer",
+           color = "black", size = 3, hjust = 0) +
+  annotate("text", x = 3500, y = 350, label = "Oceania is the\nlargest global\nproducer",
+           color = "black", size = 3, hjust = 0) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", plot.subtitle = element_text(size = 10))
+scatter_map
+
+```
+
+Dashboard
+```{r }
+my_dashboard <- (production_map + consumption_map)/(time_series_plot + scatter_map) +
+  plot_layout(heights = c(2,1)) +
+  plot_annotation(title = "Global Milk Production and Consumption trends 1995 - 2013",
+                  subtitle = "All production and consumption values are given in kg/person")
+my_dashboard
+
+```
+
