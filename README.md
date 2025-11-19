@@ -2,6 +2,7 @@
 Midterm 2 Repository
 
 Contains the solutions to the two midterm problems:
+
 Problem 1: 
 - Map of milk production in 2000
 - Map of milk consumption in 2000
