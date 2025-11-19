@@ -1,0 +1,232 @@
+
+######### Problem 2 ######### 
+
+Packages
+```{r }
+library(tidyverse)
+library(tidytext)
+library(wordcloud)
+library(RColorBrewer)
+library(ggplot2)
+library(stringr)
+library(readr)
+library(readxl)
+library(ggwordcloud)
+library(patchwork)
+```
+
+
+Read Data
+```{r }
+swift_Data <- read_excel("C:/Users/ferbe/OneDrive/Desktop/chrome downloads/Taylor_Swift_Genius_Data.xlsx")
+
+spotify_Data <- read_excel("C:/Users/ferbe/OneDrive/Desktop/chrome downloads/Taylor_Swift_Spotify_Data.xlsx")
+
+```
+
+
+Lyric Analysis
+```{r }
+stopwords <- get_stopwords()
+str(stopwords)
+
+swift_lyrics <- swift_Data %>%
+  unnest_tokens(word, Lyrics) %>%
+  anti_join(stopwords, by = "word")
+glimpse(swift_lyrics)
+
+speak_now_words <- swift_lyrics %>%
+  filter(Album == "Speak Now") %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 5)
+glimpse(speak_now_words)
+
+lover_words <- swift_lyrics %>%
+  filter(Album == "Lover") %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 5)
+glimpse(lover_words)
+
+```
+
+
+## Word Clouds 
+
+Speak Now
+```{r }
+theme_ts <- theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"),
+        plot.subtitle = element_text(color = "gray40"),
+        panel.grid.minor = element_blank())
+
+speak_now_cloud <- ggplot(speak_now_words, aes(label=word, size=n)) +
+  geom_text_wordcloud(color = "#8A2BE2") +
+  scale_size_area(max_size=10) +
+  labs(title = "Word Cloud: Speak Now") +
+  theme_minimal() +
+  theme_ts
+speak_now_cloud
+
+```
+
+Lover
+```{r }
+lover_cloud <- ggplot(lover_words, aes(label=word, size=n)) +
+  geom_text_wordcloud(color = "#FF69B4") +
+  scale_size_area(max_size=10) +
+  labs(title = "Word Cloud: Lover") +
+  theme_minimal() +
+  theme_ts
+lover_cloud
+```
+
+
+## Sentiment Analysis  
+
+```{r }
+album_sentiment <- swift_lyrics %>%
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(Album, sentiment) %>%
+  group_by(Album) %>%
+  filter(Album %in% c("Speak Now", "Lover")) %>%
+  mutate(percent = n/sum(n))
+glimpse(album_sentiment)
+
+sentiment_analysis <- ggplot(album_sentiment, aes(x = Album, y = percent, fill = sentiment)) +
+  geom_col(position = "dodge") +
+  labs(title = "Sentiment Comparison: Speak Now vs. Lover",
+       y = "Percent of Words",
+       fill = "Sentiment") +
+  scale_fill_manual(values = c("positive"="steelblue", "negative"="firebrick")) +
+  annotate("label", x = "Lover", y = 0.15, 
+           label = "We can see a significant\nincrease in positive sentiment\nin her later albums",
+           color = "black", 
+           fill = "white",
+           label.size = 0,
+           size = 3, 
+           hjust = 0) +
+  theme_minimal() +
+  theme_ts
+sentiment_analysis
+```
+
+
+## Spotify Analysis 
+
+```{r }
+song_sentiment <- swift_lyrics %>%
+  inner_join(get_sentiments("bing"), by="word") %>%
+  count(`Song Name`, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+  mutate(sentiment_score = positive - negative)
+glimpse(song_sentiment)
+
+spotify_sentiment <- spotify_Data %>%
+  inner_join(song_sentiment, by=c("Song Name"="Song Name"))
+glimpse(spotify_sentiment)
+
+```
+
+
+Sentiment vs Energy
+```{r }
+energy <- ggplot(spotify_sentiment, 
+                      aes(x = sentiment_score, y = Energy)) +
+  geom_point(color="darkblue") +
+  geom_smooth(method="lm", se=FALSE, color="black") +
+  labs(title="Sentiment vs. Energy",
+       x="Sentiment Score",
+       y="Energy") +
+  annotate("label", x = -100, y = 0.4, 
+           label = "Negative correlation between\nlyric sentiment and song energy",
+           color = "white", 
+           fill = "black",
+           label.size = 0,
+           size = 3, 
+           hjust = 0) +
+  theme_minimal() +
+  theme_ts
+energy
+
+```
+
+Sentiment vs Danceability
+```{r }
+dance <- ggplot(spotify_sentiment, 
+                     aes(x = sentiment_score, y = Danceability)) +
+  geom_point(color="purple") +
+  geom_smooth(method="lm", se=FALSE, color="black") +
+  labs(title="Sentiment vs. Danceability",
+       x="Sentiment Score",
+       y="Danceability") +
+  annotate("label", x = -100, y = 0.4, 
+           label = "Weak positive correlation between\nlyric sentiment and song danceability",
+           color = "white", 
+           fill = "black",
+           label.size = 0,
+           size = 3, 
+           hjust = 0) +
+  theme_minimal() +
+  theme_ts
+dance
+
+```
+
+Sentiment vs Valence
+```{r }
+valence <- ggplot(spotify_sentiment, 
+                       aes(x = sentiment_score, y = Valence)) +
+  geom_point(color="firebrick") +
+  geom_smooth(method="lm", se=FALSE, color="black") +
+  labs(title="Sentiment vs. Valence",
+       x="Sentiment Score",
+       y="Valence") +
+  annotate("label", x = -130, y = 0.3, 
+           label = "Strong negative correlation between\nlyric sentiment and Spotify\nreported valence",
+           color = "white", 
+           fill = "black",
+           label.size = 0,
+           size = 3, 
+           hjust = 0) +
+  theme_minimal() +
+  theme_ts
+valence
+
+```
+
+Sentiment vs Tempo
+```{r }
+tempo <- ggplot(spotify_sentiment, 
+                      aes(x = sentiment_score, y = Tempo)) +
+  geom_point(color="darkgreen") +
+  geom_smooth(method="lm", se=FALSE, color="black") +
+  labs(title="Sentiment vs. Tempo",
+       x="Sentiment Score",
+       y="Tempo") +
+  annotate("label", x = -100, y = 160, 
+           label = "Weak negative correlation between lyric\nsentiment and song tempo",
+           color = "white", 
+           fill = "black",
+           label.size = 0,
+           size = 3, 
+           hjust = 0) +
+  theme_minimal() +
+  theme_ts
+tempo
+```
+
+## Dashboard
+```{r }
+top_row <- speak_now_cloud + lover_cloud + sentiment_analysis
+bottom_row <- (energy + dance + valence + tempo)
+
+ts_dashboard <- (top_row / bottom_row) +
+  plot_annotation(title = "Taylor Swift Lyric & Sentiment Dashboard",
+                  subtitle = "Comparing Speak Now and Lover across lyrics, sentiment, and audio features",
+                  theme = theme_ts)
+ts_dashboard
+
+ggsave("dashboard.png", plot = ts_dashboard, width = 20, height = 15, dpi = 300)
+browseURL("dashboard.png")
+
+```
