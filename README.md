@@ -19,3 +19,5 @@ Problem 2:
 - Sentiment vs Danceability plot
 - Sentiment vs Valence plot
 - Sentiment vs Tempo plot
+
+![ts-dashboard](https://github.com/ferberra/STA-309-Midterm-2/blob/main/ts_dashboard.png)
