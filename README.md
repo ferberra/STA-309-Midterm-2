@@ -9,6 +9,8 @@ Problem 1:
 - Time trend map - US Milk Production/Consumption from 1995-2013
 - Comparison scatterplot of milk production/consumption trends per continent
 
+![milk-dashboard](https://github.com/ferberra/STA-309-Midterm-2/blob/main/milk_dashboard.png)
+
 Problem 2:
 - Word cloud of Speak Now lyrics
 - Word cloud of Lover lyrics
